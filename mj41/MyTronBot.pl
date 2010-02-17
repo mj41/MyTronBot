@@ -5,6 +5,8 @@ my $debug = 0;
 my $simulate = 0;
 my $generate_maps = 0;
 
+$input_file = $ARGV[0] if $ARGV[0];
+
 
 # Devel lines.
 # Comment this lines before zip and upload.
@@ -12,10 +14,11 @@ my $generate_maps = 0;
 use strict;
 use warnings;
 use Data::Dumper::Concise;
-$input_file = $ARGV[0] if $ARGV[0];
 $debug = $ARGV[1];
 $simulate = $ARGV[2];
 $generate_maps = $ARGV[3];
+
+
 
 # Directions:
 #     1
@@ -30,17 +33,17 @@ $generate_maps = $ARGV[3];
 #
 # h .. height , w ... width
 #
-#  y |
-#     - x
+#    y |
+#       - x
 #
-#  h |
-#     _ w
+#  m_y |
+#       _ m_x
 #
 # m ... map
 # mp ... my position
 # op ... oponnet position
-# w ... width
-# h ... height
+# m_x ... max x value ( = width-1 )
+# m_y ... max y value ( = height-1 )
 
 sub deb {
     my ( $str ) = @_;
@@ -159,7 +162,7 @@ sub _rec_StepsToEnd {
 
     $deep++;
     return $steps if $deep >= 8;
-    return $steps if $simulate && $deep >= 4;
+    return $steps if $simulate && $deep >= 4; # go only 4 steps to deep if developing
 
     my $dr = $dr_list->[ $#$dr_list ];
     if ( 0 && $debug ) {
@@ -218,6 +221,9 @@ sub StepsToEnd {
 }
 
 
+
+# ToDo - this is initial version of sub to grab meta info around our snake position
+#
 sub AddToBlindMap {
     my ( $g_obj, $meta, $c_x1, $c_y1, $c_x2, $c_y2 ) = @_;
 
@@ -293,7 +299,7 @@ sub ExtendBlindMap {
     AddToBlindMap( $g_obj, $meta, $mp_x-1, $mp_y  , $mp_x-1, $mp_y   ) if $mp_x-1 > 0;
 
 
-    # refresh after oponent move, if was inside our area
+    # refresh after opponent move, if was inside our area
     my ( $op_x, $op_y ) = ( $g_obj->{op}->[0], $g_obj->{op}->[1] );
     if ( $x1 < $op_x && $op_x < $x2 && $y1 < $op_y && $op_y < $y2 ) {
         AddToBlindMap( $g_obj, $meta, $op_x,   $op_y, $op_x,   $op_y );
@@ -390,7 +396,7 @@ sub RefreshMeta {
         $prev_op_dr = 4;
     }
 
-    deb("prev dr $prev_mp_dr, diff $mp_x_diff, $mp_y_diff - oponent prev dr $prev_op_dr, diff $op_x_diff, $op_y_diff\n") if $debug;
+    deb("prev dr $prev_mp_dr, diff $mp_x_diff, $mp_y_diff - opponent prev dr $prev_op_dr, diff $op_x_diff, $op_y_diff\n") if $debug;
     ExtendBlindMap( $g_obj, $meta );
 
     return 1;
@@ -421,8 +427,8 @@ sub ChooseMove {
     $available_dr{1} = 0 unless %available_dr;
 
 
-    my ( $x_diff, $y_diff ) = OponentPosDiff( $g_obj );
-    my ( $x_init_diff, $y_init_diff ) = OponentInitPosDiff( $g_obj, $meta );
+    my ( $x_diff, $y_diff ) = opponentPosDiff( $g_obj );
+    my ( $x_init_diff, $y_init_diff ) = opponentInitPosDiff( $g_obj, $meta );
 
     if ( $debug ) {
        deb('available directions ');
@@ -480,7 +486,7 @@ sub ChooseMove {
 }
 
 
-sub OponentPosDiff {
+sub opponentPosDiff {
     my ( $g_obj ) = @_;
     my $x_diff = $g_obj->{op}->[0] - $g_obj->{mp}->[0];
     my $y_diff = $g_obj->{op}->[1] - $g_obj->{mp}->[1];
@@ -488,7 +494,7 @@ sub OponentPosDiff {
 }
 
 
-sub OponentInitPosDiff {
+sub opponentInitPosDiff {
     my ( $g_obj, $meta ) = @_;
     my $x_diff = $meta->{init_op}->[0] - $g_obj->{mp}->[0];
     my $y_diff = $meta->{init_op}->[1] - $g_obj->{mp}->[1];
@@ -505,7 +511,7 @@ sub InitMetaData {
     $meta->{prev_mp} = [ $g_obj->{mp}->[0], $g_obj->{mp}->[1] ];
     $meta->{prev_op} = [ $g_obj->{op}->[0], $g_obj->{op}->[1] ];
 
-    my ( $x_diff, $y_diff ) = OponentPosDiff( $g_obj );
+    my ( $x_diff, $y_diff ) = opponentPosDiff( $g_obj );
     $meta->{init_op_diff} = [ $x_diff, $y_diff ];
 
     my $start_dr = [];
@@ -549,7 +555,7 @@ sub InitMetaData {
 }
 
 
-sub ChooseOponentMove {
+sub ChooseopponentMove {
     my ( $g_obj, $meta, $op_dr ) = @_;
 
     my %available_dr = ();
@@ -656,8 +662,11 @@ while( 1 ) {
     unless ( $simulate ) {
         Tron::MakeMove( $dr );
     } else {
+        # ToDo
+        # Run our snake first and then opponent snake.
+        # They can collide!
         SimulateMakeMove( $g_obj, $meta, $dr, 1 );
-        my $op_dr = ChooseOponentMove( $g_obj, $meta, $dr );
+        my $op_dr = ChooseopponentMove( $g_obj, $meta, $dr );
         SimulateMakeMove( $g_obj, $meta, $op_dr, 2 );
     }
 
